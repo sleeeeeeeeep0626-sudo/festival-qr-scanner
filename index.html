@@ -25,8 +25,6 @@
   <div id="reader"></div>
   <div id="status">カメラを起動しています…</div>
 
-  <!-- CORSを使わずPOSTするための非表示iframe -->
-  <iframe name="cfPostTarget" style="display:none"></iframe>
 </div>
 
 <script>
@@ -86,39 +84,22 @@ async function onScanSuccess(decodedText) {
   } catch (_) {}
 
   try {
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = callback;
-    form.target = 'cfPostTarget';
-    form.style.display = 'none';
-
-    const fields = {
-      scan_callback:'1',
-      sid:sid,
-      ticket:ticketId
-    };
-
-    Object.entries(fields).forEach(([name,value]) => {
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = name;
-      input.value = value;
-      form.appendChild(input);
-    });
-
-    document.body.appendChild(form);
-    form.submit();
+    // GoogleへPOSTしない。正常に開けることが確認済みの
+    // 受付Web /exec へ戻し、読取情報は URL fragment(#) に載せる。
+    // fragment はGoogleサーバーには送信されず、受付画面のJSだけが読む。
+    const hash =
+      '#cfscan=1' +
+      '&sid=' + encodeURIComponent(sid) +
+      '&ticket=' + encodeURIComponent(ticketId);
 
     statusEl.className='ok';
-    statusEl.textContent='送信しました。受付画面で結果を確認してください。';
+    statusEl.textContent='読み取り成功。受付画面へ戻ります。';
 
-    setTimeout(() => {
-      try { window.close(); } catch (_) {}
-    }, 1500);
+    location.replace(callback + hash);
 
   } catch (err) {
     statusEl.className='error';
-    statusEl.textContent='受付への送信に失敗しました。もう一度お試しください。';
+    statusEl.textContent='受付画面へ戻れませんでした。もう一度お試しください。';
     done = false;
   }
 }
