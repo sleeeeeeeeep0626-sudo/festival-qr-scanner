@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>文化祭 QRスキャナー</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+body{margin:0;background:#0f1115;color:white;font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue","Yu Gothic",sans-serif}
+.wrap{max-width:640px;margin:0 auto;padding:16px}#reader{overflow:hidden;border-radius:18px;background:#222}
+#status{margin-top:14px;padding:14px;border-radius:14px;background:#1f2937;text-align:center}
+</style>
+</head>
+<body><div class="wrap"><h1>文化祭 QRスキャナー</h1><div id="reader"></div><div id="status">カメラを起動しています…</div></div>
+<script>
+const params=new URLSearchParams(location.search);
+const returnUrl=params.get('return')||'';
+const returnOrigin=(()=>{try{return returnUrl?new URL(returnUrl).origin:''}catch(_){return''}})();
+const statusEl=document.getElementById('status');
+let scanner=null,done=false;
+(async()=>{
+  try{
+    scanner=new Html5Qrcode('reader',{formatsToSupport:[Html5QrcodeSupportedFormats.QR_CODE],verbose:false});
+    await scanner.start({facingMode:'environment'},{fps:10,qrbox:(w,h)=>{const e=Math.floor(Math.min(w,h)*.72);return{width:e,height:e}},aspectRatio:1},
+    async text=>{
+      if(done)return;done=true;
+      const ticketId=String(text||'').trim().toUpperCase();
+      statusEl.textContent='読み取り成功';
+      try{await scanner.stop()}catch(_){}
+      if(window.opener&&!window.opener.closed&&returnOrigin){
+        window.opener.postMessage({type:'CULTURE_FESTIVAL_QR',ticketId},returnOrigin);
+        setTimeout(()=>window.close(),250);
+      }else if(returnUrl){
+        const sep=returnUrl.includes('?')?'&':'?';
+        location.href=returnUrl+sep+'scan='+encodeURIComponent(ticketId);
+      }
+    },()=>{});
+    statusEl.textContent='QRコードを枠内に入れてください。';
+  }catch(err){
+    statusEl.textContent='カメラを起動できません。ブラウザのカメラ許可を確認してください。';
+  }
+})();
+</script></body></html>
