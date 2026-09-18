@@ -7,15 +7,14 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
   <style>
     body{
-      margin:0;background:#0f1115;color:white;
+      margin:0;
+      background:#0f1115;
+      color:white;
       font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue","Yu Gothic",sans-serif
     }
     .wrap{max-width:640px;margin:0 auto;padding:16px}
     #reader{overflow:hidden;border-radius:18px;background:#222}
-    #status{
-      margin-top:14px;padding:14px;border-radius:14px;
-      background:#1f2937;text-align:center
-    }
+    #status{margin-top:14px;padding:14px;border-radius:14px;background:#1f2937;text-align:center}
     .ok{background:#14532d!important}
     .error{background:#7f1d1d!important}
   </style>
@@ -29,7 +28,8 @@
 
 <script>
 const params = new URLSearchParams(location.search);
-const returnUrl = params.get('return') || '';
+const callback = params.get('callback') || '';
+const sid = params.get('sid') || '';
 const statusEl = document.getElementById('status');
 
 let scanner = null;
@@ -68,21 +68,25 @@ async function onScanSuccess(decodedText) {
   done = true;
 
   const ticketId = String(decodedText || '').trim().toUpperCase();
+
   statusEl.className='ok';
-  statusEl.textContent='読み取り成功。受付画面へ戻ります。';
+  statusEl.textContent='読み取り成功。受付処理中です。';
 
   try {
     if (scanner) await scanner.stop();
   } catch (_) {}
 
-  if (!returnUrl) {
+  if (!callback || !sid) {
     statusEl.className='error';
-    statusEl.textContent='戻り先URLがありません。';
+    statusEl.textContent='受付画面との接続情報がありません。';
     return;
   }
 
-  const sep = returnUrl.includes('?') ? '&' : '?';
-  location.href = returnUrl + sep + 'scan=' + encodeURIComponent(ticketId);
+  const sep = callback.includes('?') ? '&' : '?';
+  location.href =
+    callback + sep +
+    'sid=' + encodeURIComponent(sid) +
+    '&ticket=' + encodeURIComponent(ticketId);
 }
 
 startScanner();
