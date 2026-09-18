@@ -7,19 +7,14 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
   <style>
     body{
-      margin:0;
-      background:#0f1115;
-      color:white;
+      margin:0;background:#0f1115;color:white;
       font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue","Yu Gothic",sans-serif
     }
     .wrap{max-width:640px;margin:0 auto;padding:16px}
     #reader{overflow:hidden;border-radius:18px;background:#222}
     #status{
-      margin-top:14px;
-      padding:14px;
-      border-radius:14px;
-      background:#1f2937;
-      text-align:center
+      margin-top:14px;padding:14px;border-radius:14px;
+      background:#1f2937;text-align:center
     }
     .ok{background:#14532d!important}
     .error{background:#7f1d1d!important}
@@ -33,94 +28,64 @@
 </div>
 
 <script>
-  const params = new URLSearchParams(location.search);
-  const returnUrl = params.get('return') || '';
-  const statusEl = document.getElementById('status');
+const params = new URLSearchParams(location.search);
+const returnUrl = params.get('return') || '';
+const statusEl = document.getElementById('status');
 
-  let scanner = null;
-  let done = false;
+let scanner = null;
+let done = false;
 
-  async function startScanner() {
-    try {
-      scanner = new Html5Qrcode('reader', {
-        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-        verbose: false
-      });
+async function startScanner() {
+  try {
+    scanner = new Html5Qrcode('reader', {
+      formatsToSupport:[Html5QrcodeSupportedFormats.QR_CODE],
+      verbose:false
+    });
 
-      await scanner.start(
-        { facingMode: 'environment' },
-        {
-          fps: 10,
-          qrbox: (w, h) => {
-            const edge = Math.floor(Math.min(w, h) * 0.72);
-            return { width: edge, height: edge };
-          },
-          aspectRatio: 1
+    await scanner.start(
+      {facingMode:'environment'},
+      {
+        fps:10,
+        qrbox:(w,h)=>{
+          const edge=Math.floor(Math.min(w,h)*0.72);
+          return {width:edge,height:edge};
         },
-        onScanSuccess,
-        () => {}
-      );
+        aspectRatio:1
+      },
+      onScanSuccess,
+      ()=>{}
+    );
 
-      statusEl.textContent = 'QRコードを枠内に入れてください。';
+    statusEl.textContent='QRコードを枠内に入れてください。';
+  } catch(err) {
+    statusEl.className='error';
+    statusEl.textContent='カメラを起動できません。ブラウザのカメラ許可を確認してください。';
+  }
+}
 
-    } catch (err) {
-      statusEl.className = 'error';
-      statusEl.textContent =
-        'カメラを起動できません。ブラウザのカメラ許可を確認してください。';
-      console.error(err);
-    }
+async function onScanSuccess(decodedText) {
+  if (done) return;
+  done = true;
+
+  const ticketId = String(decodedText || '').trim().toUpperCase();
+  statusEl.className='ok';
+  statusEl.textContent='読み取り成功。受付画面へ戻ります。';
+
+  try {
+    if (scanner) await scanner.stop();
+  } catch (_) {}
+
+  if (!returnUrl) {
+    statusEl.className='error';
+    statusEl.textContent='戻り先URLがありません。';
+    return;
   }
 
-  async function onScanSuccess(decodedText) {
-    if (done) return;
-    done = true;
+  const sep = returnUrl.includes('?') ? '&' : '?';
+  location.href = returnUrl + sep + 'scan=' + encodeURIComponent(ticketId);
+}
 
-    const ticketId = String(decodedText || '').trim().toUpperCase();
-
-    statusEl.className = 'ok';
-    statusEl.textContent = '読み取り成功';
-
-    try {
-      if (scanner) await scanner.stop();
-    } catch (_) {}
-
-    /*
-      Apps Script のWebアプリは、実際の表示時に
-      script.google.com とは別originになる場合がある。
-      そのため送信側では "*" を使う。
-      受付Web側では event.origin が GitHub Pages のoriginかを確認している。
-    */
-    if (window.opener && !window.opener.closed) {
-      window.opener.postMessage(
-        {
-          type: 'CULTURE_FESTIVAL_QR',
-          ticketId: ticketId
-        },
-        '*'
-      );
-
-      setTimeout(() => {
-        window.close();
-      }, 400);
-
-      return;
-    }
-
-    /*
-      popup/opener が使えないブラウザ用フォールバック。
-    */
-    if (returnUrl) {
-      const sep = returnUrl.includes('?') ? '&' : '?';
-      location.href =
-        returnUrl + sep + 'scan=' + encodeURIComponent(ticketId);
-      return;
-    }
-
-    statusEl.className = 'error';
-    statusEl.textContent = '受付画面へ結果を返せませんでした。';
-  }
-
-  startScanner();
+startScanner();
 </script>
 </body>
 </html>
