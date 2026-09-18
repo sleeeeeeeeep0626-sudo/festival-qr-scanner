@@ -83,29 +83,35 @@ async function onScanSuccess(decodedText) {
   }
 
   try {
-    // Apps Script のURLへ画面遷移すると、モバイル環境で
-    // Google Drive に誤転送されることがあるため、裏でPOSTする。
-    const body =
+    // トップ画面を遷移させず、見えない画像リクエストとして
+    // Apps Script の doGet を呼ぶ。レスポンス表示は不要。
+    const sep = callback.includes('?') ? '&' : '?';
+    const requestUrl =
+      callback + sep +
       'sid=' + encodeURIComponent(sid) +
-      '&ticket=' + encodeURIComponent(ticketId);
+      '&ticket=' + encodeURIComponent(ticketId) +
+      '&cb=' + Date.now();
 
-    await fetch(callback, {
-      method:'POST',
-      mode:'no-cors',
-      headers:{
-        'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'
-      },
-      body:body,
-      redirect:'follow',
-      cache:'no-store'
-    });
+    const img = new Image();
+    img.style.display = 'none';
+    document.body.appendChild(img);
+
+    // 読み込み成功/失敗に関係なく、HTTPリクエストが送られれば
+    // Apps Script 側で受付処理は実行される。
+    img.onload = img.onerror = () => {
+      setTimeout(() => {
+        try { img.remove(); } catch (_) {}
+      }, 300);
+    };
+
+    img.src = requestUrl;
 
     statusEl.className='ok';
     statusEl.textContent='受付に送信しました。元の受付画面をご確認ください。';
 
     setTimeout(() => {
       try { window.close(); } catch (_) {}
-    }, 900);
+    }, 1200);
 
   } catch (err) {
     statusEl.className='error';
