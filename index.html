@@ -28,7 +28,6 @@
 
 <script>
 const params = new URLSearchParams(location.search);
-const nonce = params.get('nonce') || '';
 const statusEl = document.getElementById('status');
 
 let scanner = null;
@@ -75,12 +74,6 @@ async function onScanSuccess(decodedText) {
     if (scanner) await scanner.stop();
   } catch (_) {}
 
-  if (!nonce) {
-    statusEl.className='error';
-    statusEl.textContent='受付画面との接続情報がありません。';
-    return;
-  }
-
   if (!window.opener) {
     statusEl.className='error';
     statusEl.textContent='元の受付画面との接続が切れています。受付画面からQRカメラを開き直してください。';
@@ -93,8 +86,7 @@ async function onScanSuccess(decodedText) {
     window.opener.postMessage(
       {
         type:'CF_QR_RESULT',
-        ticketId:ticketId,
-        nonce:nonce
+        ticketId:ticketId
       },
       '*'
     );
