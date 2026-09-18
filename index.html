@@ -24,16 +24,27 @@
   <h1>文化祭 QRスキャナー</h1>
   <div id="reader"></div>
   <div id="status">カメラを起動しています…</div>
+
+  <!-- CORSを使わずPOSTするための非表示iframe -->
+  <iframe name="cfPostTarget" style="display:none"></iframe>
 </div>
 
 <script>
 const params = new URLSearchParams(location.search);
+const callback = params.get('callback') || '';
+const sid = params.get('sid') || '';
 const statusEl = document.getElementById('status');
 
 let scanner = null;
 let done = false;
 
 async function startScanner() {
+  if (!callback || !sid) {
+    statusEl.className='error';
+    statusEl.textContent='受付画面からQRカメラを開き直してください。';
+    return;
+  }
+
   try {
     scanner = new Html5Qrcode('reader', {
       formatsToSupport:[Html5QrcodeSupportedFormats.QR_CODE],
@@ -68,39 +79,46 @@ async function onScanSuccess(decodedText) {
   const ticketId = String(decodedText || '').trim().toUpperCase();
 
   statusEl.className='ok';
-  statusEl.textContent='読み取り成功。受付処理中です。';
+  statusEl.textContent='読み取り成功。受付へ送信しています…';
 
   try {
     if (scanner) await scanner.stop();
   } catch (_) {}
 
-  if (!window.opener) {
-    statusEl.className='error';
-    statusEl.textContent='元の受付画面との接続が切れています。受付画面からQRカメラを開き直してください。';
-    return;
-  }
-
   try {
-    // Google側へ遷移・通信せず、元の受付画面へ
-    // 読み取ったチケットIDを直接返す。
-    window.opener.postMessage(
-      {
-        type:'CF_QR_RESULT',
-        ticketId:ticketId
-      },
-      '*'
-    );
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = callback;
+    form.target = 'cfPostTarget';
+    form.style.display = 'none';
+
+    const fields = {
+      scan_callback:'1',
+      sid:sid,
+      ticket:ticketId
+    };
+
+    Object.entries(fields).forEach(([name,value]) => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = name;
+      input.value = value;
+      form.appendChild(input);
+    });
+
+    document.body.appendChild(form);
+    form.submit();
 
     statusEl.className='ok';
-    statusEl.textContent='読み取り成功。受付画面へ戻ります。';
+    statusEl.textContent='送信しました。受付画面で結果を確認してください。';
 
     setTimeout(() => {
       try { window.close(); } catch (_) {}
-    }, 500);
+    }, 1500);
 
   } catch (err) {
     statusEl.className='error';
-    statusEl.textContent='受付画面へ結果を返せませんでした。もう一度お試しください。';
+    statusEl.textContent='受付への送信に失敗しました。もう一度お試しください。';
     done = false;
   }
 }
