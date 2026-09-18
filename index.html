@@ -28,8 +28,7 @@
 
 <script>
 const params = new URLSearchParams(location.search);
-const callback = params.get('callback') || '';
-const sid = params.get('sid') || '';
+const nonce = params.get('nonce') || '';
 const statusEl = document.getElementById('status');
 
 let scanner = null;
@@ -76,46 +75,40 @@ async function onScanSuccess(decodedText) {
     if (scanner) await scanner.stop();
   } catch (_) {}
 
-  if (!callback || !sid) {
+  if (!nonce) {
     statusEl.className='error';
     statusEl.textContent='受付画面との接続情報がありません。';
     return;
   }
 
+  if (!window.opener) {
+    statusEl.className='error';
+    statusEl.textContent='元の受付画面との接続が切れています。受付画面からQRカメラを開き直してください。';
+    return;
+  }
+
   try {
-    // トップ画面を遷移させず、見えない画像リクエストとして
-    // Apps Script の doGet を呼ぶ。レスポンス表示は不要。
-    const sep = callback.includes('?') ? '&' : '?';
-    const requestUrl =
-      callback + sep +
-      'sid=' + encodeURIComponent(sid) +
-      '&ticket=' + encodeURIComponent(ticketId) +
-      '&cb=' + Date.now();
-
-    const img = new Image();
-    img.style.display = 'none';
-    document.body.appendChild(img);
-
-    // 読み込み成功/失敗に関係なく、HTTPリクエストが送られれば
-    // Apps Script 側で受付処理は実行される。
-    img.onload = img.onerror = () => {
-      setTimeout(() => {
-        try { img.remove(); } catch (_) {}
-      }, 300);
-    };
-
-    img.src = requestUrl;
+    // Google側へ遷移・通信せず、元の受付画面へ
+    // 読み取ったチケットIDを直接返す。
+    window.opener.postMessage(
+      {
+        type:'CF_QR_RESULT',
+        ticketId:ticketId,
+        nonce:nonce
+      },
+      '*'
+    );
 
     statusEl.className='ok';
-    statusEl.textContent='受付に送信しました。元の受付画面をご確認ください。';
+    statusEl.textContent='読み取り成功。受付画面へ戻ります。';
 
     setTimeout(() => {
       try { window.close(); } catch (_) {}
-    }, 1200);
+    }, 500);
 
   } catch (err) {
     statusEl.className='error';
-    statusEl.textContent='受付への送信に失敗しました。もう一度お試しください。';
+    statusEl.textContent='受付画面へ結果を返せませんでした。もう一度お試しください。';
     done = false;
   }
 }
